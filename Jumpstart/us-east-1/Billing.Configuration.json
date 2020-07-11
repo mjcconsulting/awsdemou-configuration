@@ -1,0 +1,29 @@
+{
+  "Parameters": {
+    "TopicPrefix": "DEMO",
+    "BillsTopicEmailEndpoint": "aws-bills@mjcconsulting.com",
+    "UrgentBillsTopicEmailEndpoint": "aws-managers@mjcconsulting.com",
+    "UrgentBillsTopicPhoneEndpoint": "+14156525483",
+    "EnvironmentType": "nano"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Production",
+    "Owner": "mcrawford@mjcconsulting.com"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}
