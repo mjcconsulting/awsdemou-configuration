@@ -1,0 +1,299 @@
+#!/bin/bash
+#
+# Simple script to build the AWS Demo University Account Virginia Region
+#
+# This script depends on jp, the JMESPath binary, download from:
+# - Releases; https://github.com/jmespath/jp/releases
+# - MacOS: https://github.com/jmespath/jp/releases/download/0.1.3/jp-darwin-amd64
+# - Linux: https://github.com/jmespath/jp/releases/download/0.1.3/jp-linux-amd64
+# - Windows: https://github.com/jmespath/jp/releases/download/0.1.3/jp-windows-amd64
+#
+
+#  1. Initalize Environment
+organization=${AWSDEMOU_ORGANIZATION:-mjcconsulting}
+templates=${AWSDEMOU_TEMPLATES:-$HOME/src/$organization/awsdemou-templates}
+configuration=${AWSDEMOU_CONFIGURATION:-$HOME/src/$organization/awsdemou-configuration}
+
+region=${AWS_DEFAULT_REGION:-us-east-1}
+account_alias=${AWS_ACCOUNT_ALIAS:-awsdemou}
+account_id=${AWS_ACCOUNT_ID:-692874983914}
+user=${AWS_USER_NAME:-administrator}
+
+us_east_1_stacks="\
+Billing:Billing.yaml \
+Groups:Groups.yaml \
+Users:Users.yaml \
+Roles:Roles.yaml \
+Keys:Keys.yaml \
+Topics:Topics.yaml \
+Subscriptions:Subscriptions.yaml \
+Buckets:Buckets.yaml \
+AMIFunctions:AMIFunctions.yaml \
+Organization-PublicHostedZone:PublicHostedZone.yaml \
+Production-PublicHostedZone:PublicHostedZone.yaml \
+Production-PublicRecordSets:PublicRecordSets.yaml \
+Development-PublicHostedZone:PublicHostedZone.yaml \
+Development-PublicRecordSets:PublicRecordSets.yaml \
+Build-PublicHostedZone:PublicHostedZone.yaml \
+Build-PublicRecordSets:PublicRecordSets.yaml \
+Build-VPC:VPC.yaml \
+Build-NetworkAcls:NetworkAcls.yaml"
+
+us_east_2_stacks="\
+Keys:Keys.yaml \
+Topics:Topics.yaml \
+Subscriptions:Subscriptions.yaml \
+Buckets:Buckets.yaml \
+AMIFunctions:AMIFunctions.yaml \
+Production-PublicHostedZone:PublicHostedZone.yaml \
+Production-PublicRecordSets:PublicRecordSets.yaml \
+Production-VPC:VPC.yaml \
+Production-NetworkAcls:NetworkAcls.yaml \
+Production-WordPress-Database:WordPress-Database-RDS.yaml \
+Production-WordPress:WordPress.yaml"
+
+us_west_2_stacks="\
+Keys:Keys.yaml \
+Topics:Topics.yaml \
+Subscriptions:Subscriptions.yaml \
+Buckets:Buckets.yaml \
+AMIFunctions:AMIFunctions.yaml \
+Development-PublicHostedZone:PublicHostedZone.yaml \
+Development-PublicRecordSets:PublicRecordSets.yaml \
+Production-PublicHostedZone:PublicHostedZone.yaml \
+Production-PublicRecordSets:PublicRecordSets.yaml \
+Development-VPC:VPC.yaml \
+Development-NetworkAcls:NetworkAcls.yaml\
+Production-VPC:VPC.yaml \
+Production-NetworkAcls:NetworkAcls.yaml\
+Development-WordPress-Database:WordPress-Database-RDS.yaml \
+Development-WordPress:WordPress.yaml \
+Production-WordPress-Database:WordPress-Database-RDS.yaml \
+Production-WordPress:WordPress.yaml"
+
+
+#  2. Define functions
+
+usage () {
+    echo "Usage: ${BASH_SOURCE##*/}"
+    echo "  -r region       Region (default: $region)"
+    echo "  -a account      Account Alias (default: $account_alias)"
+    echo "  -A account_ID   Account ID (default: $account_id)"
+    echo "  -u user         User (default: $user)"
+}
+
+#  3. Parse command line options
+
+OPTIND=1 # Needed when running this script via 'source mjc ...'
+
+while getopts r:a:A:u:? arg; do
+    case $arg in
+    r)  region="$OPTARG";;
+    a)  account_alias="$OPTARG";;
+    A)  account_id="$OPTARG";;
+    u)  user="$OPTARG";;
+    ?)  usage
+        exit;;
+    esac
+done
+
+shift $(($OPTIND - 1))
+
+
+#  4. Validate environment
+
+if [ -z "$region" ]; then
+    echo "-r region missing!"
+    echo "Could not automatically determine region, and it was not specified as a parameter"
+    exit 50
+else
+    case $region in
+      us-east-1|us-east-2|us-west-1|us-west-2|ca-central-1|eu-west-1|eu-central-1|eu-west-2|eu-west-3|eu-north-1|ap-east-1|ap-southeast-1|ap-southeast-2|ap-northeast-2|ap-northeast-1|ap-south-1|me-south-1|sa-east-1)
+      stacks_variable=${region//-/_}_stacks
+      stacks="${!stacks_variable}";;
+      *)
+        echo "-r $region invalid: Please specify a valid region"
+        exit 51;;
+    esac
+fi
+
+if [ -z "$account_alias" ]; then
+    echo "-a account missing!"
+    echo "Could not automatically determine account alias, and it was not specified as a parameter"
+    exit 52
+else
+    case $account_alias in
+      awsdemou)
+        account_id=692874983914
+        ;;
+      *)
+        echo "-a $account_alias invalid! Must be awsdemou"
+        exit 53;;
+    esac
+fi
+
+if [ -z "$account_id" ]; then
+    echo "-A account_id missing!"
+    echo "Could not automatically determine account id, and it was not specified as a parameter"
+    exit 54
+else
+    case $account_id in
+      692874983914)
+        ;;
+      *)
+        echo "-A $account_id invalid! Must be 692874983914"
+        exit 55;;
+    esac
+fi
+
+if [ -z "$user" ]; then
+    echo "-u user missing!"
+    echo "Could not automatically determine user, and it was not specified as a parameter"
+    exit 56
+fi
+
+profile=$account_alias-$user
+
+if ! grep -s -q "\[profile $profile]" ~/.aws/config; then
+    echo "Could not find ($account_alias) Account ($user) User AWSCLI profile!"
+    echo "Expected to find: [profile $profile] in ~/.aws/config"
+    exit 58
+fi
+
+# Prevent certain environment variables from breaking commands
+unset AWS_PROFILE
+unset AWS_DEFAULT_PROFILE
+unset AWS_CREDENTIAL_FILE
+unset EC2_PRIVATE_KEY
+unset EC2_CERT
+
+
+#  5. Create Bootstrap Buckets
+
+echo "Checking Bootstrap Buckets..."
+templates_bucket=bootstrap-templates-$account_alias-$region
+if ! aws s3api head-bucket --bucket $templates_bucket \
+                           --profile $profile --region $region &> /dev/null; then
+  echo -n "- $templates_bucket Bucket does not exist, creating... "
+  if aws s3api create-bucket --bucket $templates_bucket \
+                             --profile $profile --region $region &> /dev/null; then
+    echo "Created!"
+    sleep 1
+  else
+    echo "Failed ($?), exiting!"
+    exit 99
+  fi
+fi
+
+functions_bucket=bootstrap-functions-$account_alias-$region
+if ! aws s3api head-bucket --bucket $functions_bucket \
+                           --profile $profile --region $region &> /dev/null; then
+  echo -n "- $functions_bucket Bucket does not exist, creating... "
+  if aws s3api create-bucket --bucket $functions_bucket \
+                             --profile $profile --region $region &> /dev/null; then
+    echo "Created!"
+    sleep 1
+  else
+    echo "Failed ($?), exiting!"
+    exit 99
+  fi
+fi
+
+#  5. Create Bootstrap Buckets
+
+echo "Creating Stacks..."
+
+for stack in $stacks; do
+  stack_name=${stack%:*}
+  stack_template=$templates/${stack#*:}
+  stack_config=$configuration/$account_id/$region/${stack_name}.Configuration.json
+
+  # Figure out a way to do these transformations purely with jp expressions
+  parameters=$(jp -f $stack_config 'Parameters' | sed -n -e 's/^ *"\([^"]*\)": *"\([^"]*\)".*$/\1=\2/p' | tr '\n' ' ')
+  tags=$(jp -f $stack_config 'Tags' | sed -n -e 's/^ *"\([^"]*\)": *"\([^"]*\)".*$/\1=\2/p' | tr '\n' ' ')
+  statement=$(jp -f $stack_config 'Statement')
+
+  # Construct Deploy Statement
+  statement="aws cloudformation deploy --stack-name $stack_name \\"$'\n'
+  statement+="                          --template $stack_template \\"$'\n'
+  statement+="                          --s3-bucket $templates_bucket \\"$'\n'
+  statement+="                          --force-upload \\"$'\n'
+
+  if [ -n "$parameters" ]; then
+    first=1
+    for parameter in $parameters; do
+      if [ $first = 1 ]; then
+        statement+="                          --parameter-overrides $parameter \\"$'\n'
+        first=0
+      else
+        statement+="                                                $parameter \\"$'\n'
+      fi
+    done
+  fi
+
+  if egrep -q 'Type: *AWS::IAM::(ManagedPolicy|Role|Group|User)' $stack_template; then
+    if egrep -q ' (ManagedPolicy|Role|Group|User)Name:' $stack_template; then
+      statement+="                          --capabilities CAPABILITY_NAMED_IAM \\"$'\n'
+    else
+      statement+="                          --capabilities CAPABILITY_IAM \\"$'\n'
+    fi
+  fi
+
+  if [ -n "$tags" ]; then
+    first=1
+    for tag in $tags; do
+      if [ $first = 1 ]; then
+        statement+="                          --tags $tag \\"$'\n'
+        first=0
+      else
+        statement+="                                 $tag \\"$'\n'
+      fi
+    done
+  fi
+
+  if aws cloudformation describe-stacks --stack-name $stack_name \
+                                        --profile $profile --region $region --output text &> /dev/null; then
+    statement+="                          --no-fail-on-empty-changeset \\"$'\n'
+    stack_exists=1
+  else
+    statement+="                          --fail-on-empty-changeset \\"$'\n'
+    stack_exists=0
+  fi
+
+  statement+="                          --profile $profile --region $region"
+  eval_statement="${statement//\\$'\n'}"
+
+  echo "$statement"
+
+  if [ $stack_exists = 0 ]; then
+    echo -n "Create[Y/n/q]?"
+  else
+    echo -n "Update[Y/n/q]?"
+  fi
+  read answer
+
+  if [[ $answer =~ (^$|^(y|Y|yes|Yes)$) ]]; then
+    if eval "$eval_statement"; then
+      RC=$?
+      echo "Success! ($RC)"
+    else
+      RC=$?
+      echo "Failure! ($RC) - Continue[y/N/q]?"
+      read answer
+      if [[ ! $answer =~ (^$|^(y|Y|yes|Yes)$) ]]; then
+        exit
+      fi
+    fi
+  elif [[ $answer =~ ^(q|Q|quit|Quit)$ ]]; then
+    exit
+  fi
+done
+
+exit
+
+# Save below here
+    if [ -n "$statement" ]; then
+      stack_policy_body="{ "Statement" : $(echo $statement) }"
+    else
+      unset stack_policy_body
+    fi
