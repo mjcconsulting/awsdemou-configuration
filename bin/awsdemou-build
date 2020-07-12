@@ -17,7 +17,7 @@ configuration=${AWSDEMOU_CONFIGURATION:-$HOME/src/$organization/awsdemou-configu
 region=${AWS_DEFAULT_REGION:-us-east-1}
 account_alias=${AWS_ACCOUNT_ALIAS:-awsdemou}
 account_id=${AWS_ACCOUNT_ID:-692874983914}
-user=${AWS_USER_NAME:-administrator}
+user=${AWS_USER_NAME:-bootstrapadministrator}
 
 us_east_1_stacks="\
 Billing:Billing.yaml \
@@ -263,6 +263,7 @@ for stack in $stacks; do
   statement+="                          --profile $profile --region $region"
   eval_statement="${statement//\\$'\n'}"
 
+  echo
   echo "$statement"
 
   if [ $stack_exists = 0 ]; then
@@ -273,14 +274,10 @@ for stack in $stacks; do
   read answer
 
   if [[ $answer =~ (^$|^(y|Y|yes|Yes)$) ]]; then
-    if eval "$eval_statement"; then
-      RC=$?
-      echo "Success! ($RC)"
-    else
-      RC=$?
-      echo "Failure! ($RC) - Continue[y/N/q]?"
+    if ! eval "$eval_statement"; then
+      echo -n "Continue[y/N/q]?"
       read answer
-      if [[ ! $answer =~ (^$|^(y|Y|yes|Yes)$) ]]; then
+      if [[ ! $answer =~ ^(y|Y|yes|Yes)$ ]]; then
         exit
       fi
     fi
