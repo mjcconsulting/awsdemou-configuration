@@ -1,0 +1,26 @@
+# Stack_Name:Template:Process
+Billing:Billing.yaml
+
+Groups:Groups.yaml
+Users:Users.yaml
+Roles:Roles.yaml
+
+Keys:Keys.yaml
+Topics:Topics.yaml
+Subscriptions:Subscriptions.yaml
+Buckets:Buckets.yaml
+
+Layers:Layers.yaml:1
+AMIFunctions:AMIFunctions.yaml
+DomainFunctions:DomainFunctions.yaml:1
+
+Organization-PublicHostedZone:PublicHostedZone.yaml
+Organization-PublicRecordSets:PublicRecordSets.yaml
+Development-PublicHostedZone:PublicHostedZone.yaml
+Development-PublicRecordSets:PublicRecordSets.yaml
+
+Build-PublicHostedZone:PublicHostedZone.yaml
+Build-PublicRecordSets:PublicRecordSets.yaml
+
+Build-VPC:VPC.yaml
+Build-NetworkAcls:NetworkAcls.yaml

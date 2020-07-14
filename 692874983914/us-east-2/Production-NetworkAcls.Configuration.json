@@ -1,0 +1,25 @@
+{
+  "Parameters": {
+    "VPCStackName": "Production-VPC"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Production",
+    "Owner": "mcrawford@mjcconsulting.com"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}

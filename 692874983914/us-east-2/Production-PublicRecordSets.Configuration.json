@@ -1,0 +1,27 @@
+{
+  "Parameters": {
+    "PublicHostedZoneStackName": "Production-PublicHostedZone",
+    "EnvironmentName": "Production",
+    "CheckTXTValue": "Production0000000000000000000000"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Production",
+    "Owner": "mcrawford@mjcconsulting.com"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}

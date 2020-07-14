@@ -1,0 +1,27 @@
+{
+  "Parameters": {
+    "EnvironmentName": "Build",
+    "PublicDomain": "b.awsdemou.com",
+    "UseHostedZoneDelegation": "true"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Build",
+    "Owner": "mcrawford@mjcconsulting.com"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}

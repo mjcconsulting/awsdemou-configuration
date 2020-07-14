@@ -1,0 +1,30 @@
+{
+  "Parameters": {
+    "EventsTopicEmailEndpoint": "aws-events@mjcconsulting.com",
+    "UrgentEventsTopicEmailEndpoint": "aws-managers@mjcconsulting.com",
+    "UrgentEventsTopicPhoneEndpoint": "+14156525483",
+    "AlarmsTopicEmailEndpoint": "aws-alarms@mjcconsulting.com",
+    "UrgentAlarmsTopicEmailEndpoint": "aws-managers@mjcconsulting.com",
+    "UrgentAlarmsTopicPhoneEndpoint": "+14156525483"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Jumpstart",
+    "Owner": "mcrawford@mjcconsulting.com"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}

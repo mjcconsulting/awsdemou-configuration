@@ -1,0 +1,20 @@
+# Stack_Name:Template:Process
+Keys:Keys.yaml
+Topics:Topics.yaml
+Subscriptions:Subscriptions.yaml
+Buckets:Buckets.yaml
+
+Layers:Layers.yaml:1
+AMIFunctions:AMIFunctions.yaml
+DomainFunctions:DomainFunctions.yaml:1
+
+Organization-PublicHostedZone:PublicHostedZone.yaml
+Organization-PublicRecordSets:PublicRecordSets.yaml
+Production-PublicHostedZone:PublicHostedZone.yaml
+Production-PublicRecordSets:PublicRecordSets.yaml
+
+Production-VPC:VPC.yaml
+Production-NetworkAcls:NetworkAcls.yaml
+
+Production-WordPress-Database:WordPress-Database-RDS.yaml
+Production-WordPress:WordPress.yaml

@@ -1,0 +1,33 @@
+{
+  "Parameters": {
+    "WordPressDatabaseStackName": "Development-WordPress-Database",
+    "VPCStackName": "Development-VPC",
+    "KeyPairName": "administrator",
+    "AccountName": "Jumpstart",
+    "EnvironmentName": "Development",
+    "EnvironmentType": "small",
+    "WordPressProductKey": "WordPress/wordpress-5.2.4.zip"",
+    "WordPressAdministratorEmail": "aws-administrators@mjcconsulting.com"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Development",
+    "Owner": "mcrawford@mjcconsulting.com",
+    "Application": "WordPress"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}

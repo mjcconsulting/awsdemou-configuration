@@ -1,0 +1,31 @@
+{
+  "Parameters": {
+    "PublicHostedZoneStackName": "Build-PublicHostedZone",
+    "KeyPairName": "administrator",
+    "EnvironmentName": "Build",
+    "EnvironmentType": "xlarge",
+    "UseRedundantNatGateways": "false",
+    "Network": "10.15.192.0/19",
+    "PrivateDomain": "b.awsdemou.com"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Build",
+    "Owner": "mcrawford@mjcconsulting.com"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}

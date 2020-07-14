@@ -1,0 +1,31 @@
+{
+  "Parameters": {
+    "PublicHostedZoneStackName": "Production-PublicHostedZone",
+    "KeyPairName": "administrator",
+    "EnvironmentName": "Production",
+    "EnvironmentType": "large",
+    "UseRedundantNatGateways": "false",
+    "Network": "10.32.0.0/20",
+    "PrivateDomain": "p.us-west-2.awsdemou.com"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Production",
+    "Owner": "mcrawford@mjcconsulting.com"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}

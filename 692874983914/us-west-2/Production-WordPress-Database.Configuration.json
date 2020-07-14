@@ -1,0 +1,37 @@
+{
+  "Parameters": {
+    "VPCStackName": "Production-VPC",
+    "AccountName": "Jumpstart",
+    "EnvironmentName": "Production",
+    "EnvironmentType": "micro",
+    "EnvironmentZones": "1",
+    "HostName": "aduuw2pwpdb",
+    "EncryptionType": "custom",
+    "BackupRetention": "1",
+    "BackupWindow": "06:00-06:30",
+    "MaintenanceWindow": "sat:07:00-sat:07:30",
+    "WordPressDatabaseName": "wordpress"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Production",
+    "Owner": "mcrawford@mjcconsulting.com",
+    "Application": "WordPress",
+    "Component": "Database"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}

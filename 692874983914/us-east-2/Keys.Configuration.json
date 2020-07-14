@@ -1,0 +1,36 @@
+{
+  "Parameters": {
+    "CompanyCode": "demo",
+    "EnvironmentName": "Jumpstart",
+    "UseDynamoDBKey": "false",
+    "UseEBSKey": "true",
+    "UseElasticFilesystemKey": "false",
+    "UseESKey": "false",
+    "UseGlueKey": "false",
+    "UseRDSKey": "true",
+    "UseRedShiftKey": "false",
+    "UseS3Key": "true",
+    "UseSecretsManagerKey": "false",
+    "UseSSMKey": "false"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Jumpstart",
+    "Owner": "mcrawford@mjcconsulting.com"
+  },
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "Update:Modify",
+      "Principal": "*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": [ "Update:Replace", "Update:Delete" ],
+      "Principal": "*",
+      "Resource": "*"
+    }
+  ]
+}
