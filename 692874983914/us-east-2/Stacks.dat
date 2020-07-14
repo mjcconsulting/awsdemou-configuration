@@ -8,6 +8,9 @@ Layers:Layers.yaml:1
 AMIFunctions:AMIFunctions.yaml
 DomainFunctions:DomainFunctions.yaml:1
 
+#AmazonLinux2ImageCustomResource:AmazonLinux2ImageCustomResource.yaml
+#WordPressAmazonLinux2ImageCustomResource:WordPressAmazonLinux2ImageCustomResource.yaml
+
 Organization-PublicHostedZone:PublicHostedZone.yaml
 Organization-PublicRecordSets:PublicRecordSets.yaml
 Production-PublicHostedZone:PublicHostedZone.yaml
@@ -17,4 +20,4 @@ Production-VPC:VPC.yaml
 Production-NetworkAcls:NetworkAcls.yaml
 
 Production-WordPress-Database:WordPress-Database-RDS.yaml
-Production-WordPress:WordPress.yaml
+#Production-WordPress:WordPress.yaml

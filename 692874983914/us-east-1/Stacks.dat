@@ -9,10 +9,14 @@ Keys:Keys.yaml
 Topics:Topics.yaml
 Subscriptions:Subscriptions.yaml
 Buckets:Buckets.yaml
+BuildBuckets:BuildBuckets.yaml
 
 Layers:Layers.yaml:1
 AMIFunctions:AMIFunctions.yaml
 DomainFunctions:DomainFunctions.yaml:1
+
+#AmazonLinux2ImageCustomResource:AmazonLinux2ImageCustomResource.yaml
+#WordPressAmazonLinux2ImageCustomResource:WordPressAmazonLinux2ImageCustomResource.yaml
 
 Organization-PublicHostedZone:PublicHostedZone.yaml
 Organization-PublicRecordSets:PublicRecordSets.yaml
@@ -24,3 +28,7 @@ Build-PublicRecordSets:PublicRecordSets.yaml
 
 Build-VPC:VPC.yaml
 Build-NetworkAcls:NetworkAcls.yaml
+
+Components:Components.yaml
+ImageRecipes:ImageRecipes.yaml
+ImagePipelines:ImagePipelines.yaml
