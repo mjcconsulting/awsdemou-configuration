@@ -8,6 +8,8 @@
 # - Linux: https://github.com/jmespath/jp/releases/download/0.1.3/jp-linux-amd64
 # - Windows: https://github.com/jmespath/jp/releases/download/0.1.3/jp-windows-amd64
 #
+# TODO: Current bugs in this script
+# - The section which extracts parameters from the stack_config can't handle values with embedded spaces
 
 #  1. Initalize Environment
 buckets=1
@@ -349,6 +351,7 @@ for stack_tuple in $stacks; do
                 s3://$scripts_bucket \
                 --exclude '*' \
                 --include 'Linux/*' \
+                --include 'Windows/*' \
                 --include 'WordPress/*' \
                 --profile $profile --region $region --output table
     sync=0
