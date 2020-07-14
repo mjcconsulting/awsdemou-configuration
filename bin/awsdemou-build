@@ -10,91 +10,59 @@
 #
 
 #  1. Initalize Environment
+buckets=1
+packages=1
+updates=0
+
 organization=${AWSDEMOU_ORGANIZATION:-mjcconsulting}
-templates=${AWSDEMOU_TEMPLATES:-$HOME/src/$organization/awsdemou-templates}
-configuration=${AWSDEMOU_CONFIGURATION:-$HOME/src/$organization/awsdemou-configuration}
+templates_dir=${AWSDEMOU_TEMPLATES:-$HOME/src/$organization/awsdemou-templates}
+functions_dir=${AWSDEMOU_FUNCTIONS:-$HOME/src/$organization/awsdemou-functions}
+scripts_dir=${AWSDEMOU_SCRIPTS:-$HOME/src/$organization/awsdemou-scripts}
+configuration_dir=${AWSDEMOU_CONFIGURATION:-$HOME/src/$organization/awsdemou-configuration}
 
 region=${AWS_DEFAULT_REGION:-us-east-1}
-account_alias=${AWS_ACCOUNT_ALIAS:-awsdemou}
-account_id=${AWS_ACCOUNT_ID:-692874983914}
+account=${AWS_ACCOUNT_ALIAS:-awsdemou}
 user=${AWS_USER_NAME:-bootstrapadministrator}
 
-us_east_1_stacks="\
-Billing:Billing.yaml \
-Groups:Groups.yaml \
-Users:Users.yaml \
-Roles:Roles.yaml \
-Keys:Keys.yaml \
-Topics:Topics.yaml \
-Subscriptions:Subscriptions.yaml \
-Buckets:Buckets.yaml \
-AMIFunctions:AMIFunctions.yaml \
-Organization-PublicHostedZone:PublicHostedZone.yaml \
-Production-PublicHostedZone:PublicHostedZone.yaml \
-Production-PublicRecordSets:PublicRecordSets.yaml \
-Development-PublicHostedZone:PublicHostedZone.yaml \
-Development-PublicRecordSets:PublicRecordSets.yaml \
-Build-PublicHostedZone:PublicHostedZone.yaml \
-Build-PublicRecordSets:PublicRecordSets.yaml \
-Build-VPC:VPC.yaml \
-Build-NetworkAcls:NetworkAcls.yaml"
-
-us_east_2_stacks="\
-Keys:Keys.yaml \
-Topics:Topics.yaml \
-Subscriptions:Subscriptions.yaml \
-Buckets:Buckets.yaml \
-AMIFunctions:AMIFunctions.yaml \
-Production-PublicHostedZone:PublicHostedZone.yaml \
-Production-PublicRecordSets:PublicRecordSets.yaml \
-Production-VPC:VPC.yaml \
-Production-NetworkAcls:NetworkAcls.yaml \
-Production-WordPress-Database:WordPress-Database-RDS.yaml \
-Production-WordPress:WordPress.yaml"
-
-us_west_2_stacks="\
-Keys:Keys.yaml \
-Topics:Topics.yaml \
-Subscriptions:Subscriptions.yaml \
-Buckets:Buckets.yaml \
-AMIFunctions:AMIFunctions.yaml \
-Development-PublicHostedZone:PublicHostedZone.yaml \
-Development-PublicRecordSets:PublicRecordSets.yaml \
-Production-PublicHostedZone:PublicHostedZone.yaml \
-Production-PublicRecordSets:PublicRecordSets.yaml \
-Development-VPC:VPC.yaml \
-Development-NetworkAcls:NetworkAcls.yaml\
-Production-VPC:VPC.yaml \
-Production-NetworkAcls:NetworkAcls.yaml\
-Development-WordPress-Database:WordPress-Database-RDS.yaml \
-Development-WordPress:WordPress.yaml \
-Production-WordPress-Database:WordPress-Database-RDS.yaml \
-Production-WordPress:WordPress.yaml"
+timestamp=$(date +%Y%M%d-%H%M%S)
+sync=1
 
 
 #  2. Define functions
 
 usage () {
-    echo "Usage: ${BASH_SOURCE##*/}"
-    echo "  -r region       Region (default: $region)"
-    echo "  -a account      Account Alias (default: $account_alias)"
-    echo "  -A account_ID   Account ID (default: $account_id)"
-    echo "  -u user         User (default: $user)"
+  echo "Usage: ${BASH_SOURCE##*/} [-B] [-P] [-u]"
+  echo "              [-T path] [-F path] [-S path] [-C path]"
+  echo "              [-r region] [-a account] [-u user]"
+  echo "  -B          Skip Bucket Confirmation (assume permanent buckets exist)"
+  echo "  -P          Skip Package Builds (assume package zip files exist)"
+  echo "  -u          Update Existing Stacks"
+  echo "  -T path     Path to awsdemou-templates repo (default: $templates_dir)"
+  echo "  -F path     Path to awsdemou-functions repo (default: $functions_dir)"
+  echo "  -S path     Path to awsdemou-scripts repo (default: $scripts_dir)"
+  echo "  -C path     Path to awsdemou-configuration repo (default: $configuration_dir)"
+  echo "  -r region   Region (default: $region)"
+  echo "  -a account  Account Alias (default: $account)"
+  echo "  -u user     User (default: $user)"
 }
 
 #  3. Parse command line options
 
-OPTIND=1 # Needed when running this script via 'source mjc ...'
-
-while getopts r:a:A:u:? arg; do
-    case $arg in
-    r)  region="$OPTARG";;
-    a)  account_alias="$OPTARG";;
-    A)  account_id="$OPTARG";;
-    u)  user="$OPTARG";;
-    ?)  usage
-        exit;;
-    esac
+while getopts BPuT:F:S:C:r:a:u:? arg; do
+  case $arg in
+  B)  buckets=0;;
+  P)  packages=0;;
+  u)  updates=1;;
+  T)  templates_dir="$OPTARG";;
+  F)  functions_dir="$OPTARG";;
+  S)  scripts_dir="$OPTARG";;
+  C)  configuration_dir="$OPTARG";;
+  r)  region="$OPTARG";;
+  a)  account="$OPTARG";;
+  u)  user="$OPTARG";;
+  ?)  usage
+      exit;;
+  esac
 done
 
 shift $(($OPTIND - 1))
@@ -102,47 +70,92 @@ shift $(($OPTIND - 1))
 
 #  4. Validate environment
 
+if [ -z "$templates_dir" ]; then
+  echo "-T path missing!"
+  echo "Could not automatically determine templates path, and it was not specified as a parameter"
+  exit 10
+elif [ ! -d "$templates_dir" ]; then
+  echo "-T $templates_dir not a directory: Please specify a valid directory"
+  exit 11
+elif [ ! -f "$templates_dir/README.md" ]; then
+  echo "-T $templates_dir does not appear to be a valid clone of awsdemou-templates, missing README.md file"
+  exit 12
+elif ! grep -s -q "# AWS Demo University Templates" "$templates_dir/README.md" ; then
+  echo "-T $templates_dir does not appear to be a valid clone of awsdemou-templates, README.md title incorrect"
+  exit 13
+fi
+
+if [ -z "$functions_dir" ]; then
+  echo "-F path missing!"
+  echo "Could not automatically determine functions path, and it was not specified as a parameter"
+  exit 20
+elif [ ! -d "$functions_dir" ]; then
+  echo "-F $functions_dir not a directory: Please specify a valid directory"
+  exit 21
+elif [ ! -f "$functions_dir/README.md" ]; then
+  echo "-F $functions_dir does not appear to be a valid clone of awsdemou-functions, missing README.md file"
+  exit 22
+elif ! grep -s -q "# AWS Demo University Functions" "$functions_dir/README.md" ; then
+  echo "-F $functions_dir does not appear to be a valid clone of awsdemou-functions, README.md title incorrect"
+  exit 23
+fi
+
+if [ -z "$scripts_dir" ]; then
+  echo "-S path missing!"
+  echo "Could not automatically determine scripts path, and it was not specified as a parameter"
+  exit 30
+elif [ ! -d "$scripts_dir" ]; then
+  echo "-S $scripts_dir not a directory: Please specify a valid directory"
+  exit 31
+elif [ ! -f "$scripts_dir/README.md" ]; then
+  echo "-S $scripts_dir does not appear to be a valid clone of awsdemou-scripts, missing README.md file"
+  exit 32
+elif ! grep -s -q "# AWS Demo University Scripts" "$scripts_dir/README.md" ; then
+  echo "-S $scripts_dir does not appear to be a valid clone of awsdemou-scripts, README.md title incorrect"
+  exit 33
+fi
+
+if [ -z "$configuration_dir" ]; then
+  echo "-C path missing!"
+  echo "Could not automatically determine configuration path, and it was not specified as a parameter"
+  exit 40
+elif [ ! -d "$configuration_dir" ]; then
+  echo "-C $configuration_dir not a directory: Please specify a valid directory"
+  exit 41
+elif [ ! -f "$configuration_dir/README.md" ]; then
+  echo "-C $configuration_dir does not appear to be a valid clone of awsdemou-configuration, missing README.md file"
+  exit 42
+elif ! grep -s -q "# AWS Demo University Configuration" "$configuration_dir/README.md" ; then
+  echo "-C $configuration_dir does not appear to be a valid clone of awsdemou-configuration, README.md title incorrect"
+  exit 43
+fi
+
 if [ -z "$region" ]; then
     echo "-r region missing!"
     echo "Could not automatically determine region, and it was not specified as a parameter"
     exit 50
 else
     case $region in
-      us-east-1|us-east-2|us-west-1|us-west-2|ca-central-1|eu-west-1|eu-central-1|eu-west-2|eu-west-3|eu-north-1|ap-east-1|ap-southeast-1|ap-southeast-2|ap-northeast-2|ap-northeast-1|ap-south-1|me-south-1|sa-east-1)
-      stacks_variable=${region//-/_}_stacks
-      stacks="${!stacks_variable}";;
+      us-east-1|us-east-2|us-west-2)
+        ;;
       *)
-        echo "-r $region invalid: Please specify a valid region"
+        echo "-r $region invalid: Please specify a valid region (us-east-1, us-east-2 r us-west-2)"
         exit 51;;
     esac
 fi
 
-if [ -z "$account_alias" ]; then
+if [ -z "$account" ]; then
     echo "-a account missing!"
     echo "Could not automatically determine account alias, and it was not specified as a parameter"
     exit 52
 else
-    case $account_alias in
+    case $account in
       awsdemou)
         account_id=692874983914
         ;;
       *)
-        echo "-a $account_alias invalid! Must be awsdemou"
+        echo "-a $account invalid! Must be awsdemou"
         exit 53;;
-    esac
-fi
-
-if [ -z "$account_id" ]; then
-    echo "-A account_id missing!"
-    echo "Could not automatically determine account id, and it was not specified as a parameter"
-    exit 54
-else
-    case $account_id in
-      692874983914)
-        ;;
-      *)
-        echo "-A $account_id invalid! Must be 692874983914"
-        exit 55;;
     esac
 fi
 
@@ -152,12 +165,17 @@ if [ -z "$user" ]; then
     exit 56
 fi
 
-profile=$account_alias-$user
+profile=$account-$user
 
 if ! grep -s -q "\[profile $profile]" ~/.aws/config; then
-    echo "Could not find ($account_alias) Account ($user) User AWSCLI profile!"
+    echo "Could not find ($account) Account ($user) User AWSCLI profile!"
     echo "Expected to find: [profile $profile] in ~/.aws/config"
     exit 58
+fi
+
+if [ ! -f "$configuration_dir/$account_id/$region/Stacks.dat" ]; then
+  echo "Could not find $configuration_dir/$account_id/$region/Stacks.dat data file"
+  exit 60
 fi
 
 # Prevent certain environment variables from breaking commands
@@ -170,45 +188,194 @@ unset EC2_CERT
 
 #  5. Create Bootstrap Buckets
 
-echo "Checking Bootstrap Buckets..."
-templates_bucket=bootstrap-templates-$account_alias-$region
-if ! aws s3api head-bucket --bucket $templates_bucket \
-                           --profile $profile --region $region &> /dev/null; then
-  echo -n "- $templates_bucket Bucket does not exist, creating... "
-  if aws s3api create-bucket --bucket $templates_bucket \
+if [ ! $region = 'us-east-1' ]; then
+  location_constraint="--create-bucket-configuration LocationConstraint=$region"
+else
+  unset location_constraint
+fi
+
+templates_bucket=templates-$account-$region
+bootstrap_templates_bucket=bootstrap-templates-$account-$region
+functions_bucket=functions-$account-$region
+bootstrap_functions_bucket=bootstrap-functions-$account-$region
+scripts_bucket=scripts-$account-$region
+bootstrap_scripts_bucket=bootstrap-scripts-$account-$region
+
+if [ $buckets = 1 ]; then
+  echo "Checking Buckets..."
+
+  echo -n "- $templates_bucket Bucket... "
+  if ! aws s3api head-bucket --bucket $templates_bucket \
                              --profile $profile --region $region &> /dev/null; then
-    echo "Created!"
-    sleep 1
+    echo "does not exist"
+    echo -n "- $bootstrap_templates_bucket Bucket... "
+    if ! aws s3api head-bucket --bucket $bootstrap_templates_bucket \
+                               --profile $profile --region $region &> /dev/null; then
+      echo -n "does not exist, creating... "
+      if aws s3api create-bucket --bucket $bootstrap_templates_bucket $location_constraint \
+                                 --profile $profile --region $region &> /dev/null; then
+        echo "Created!"
+      else
+        echo "Failed ($?), exiting!"
+        exit 99
+      fi
+    else
+      echo "exists"
+    fi
+    templates_bucket=$bootstrap_templates_bucket # Use Bootstrap Buckets until permanent Buckets exist
   else
-    echo "Failed ($?), exiting!"
-    exit 99
+    echo "exists"
+    echo -n "- $bootstrap_templates_bucket Bucket... "
+    if aws s3api head-bucket --bucket $bootstrap_templates_bucket \
+                             --profile $profile --region $region &> /dev/null; then
+      echo "exists (but is no longer needed - delete via Console!)"
+    else
+      echo "does not exist"
+    fi
+  fi
+
+  echo -n "- $functions_bucket Bucket... "
+  if ! aws s3api head-bucket --bucket $functions_bucket \
+                             --profile $profile --region $region &> /dev/null; then
+    echo "does not exist"
+    echo -n "- $bootstrap_functions_bucket Bucket... "
+    if ! aws s3api head-bucket --bucket $bootstrap_functions_bucket \
+                               --profile $profile --region $region &> /dev/null; then
+      echo -n "does not exist, creating... "
+      if aws s3api create-bucket --bucket $bootstrap_functions_bucket $location_constraint \
+                                 --profile $profile --region $region &> /dev/null; then
+        echo "Created!"
+      else
+        echo "Failed ($?), exiting!"
+        exit 99
+      fi
+    else
+      echo "exists"
+    fi
+    functions_bucket=$bootstrap_functions_bucket # Use Bootstrap Buckets until permanent Buckets exist
+  else
+    echo "exists"
+    echo -n "- $bootstrap_functions_bucket Bucket... "
+    if aws s3api head-bucket --bucket $bootstrap_functions_bucket \
+                             --profile $profile --region $region &> /dev/null; then
+      echo "exists (but is no longer needed - delete via Console!)"
+    else
+      echo "does not exist"
+    fi
+  fi
+
+  echo -n "- $scripts_bucket Bucket... "
+  if ! aws s3api head-bucket --bucket $scripts_bucket \
+                             --profile $profile --region $region &> /dev/null; then
+    echo "does not exist"
+    echo -n "- $bootstrap_scripts_bucket Bucket... "
+    if ! aws s3api head-bucket --bucket $bootstrap_scripts_bucket \
+                               --profile $profile --region $region &> /dev/null; then
+      echo -n "does not exist, creating... "
+      if aws s3api create-bucket --bucket $bootstrap_scripts_bucket $location_constraint \
+                                 --profile $profile --region $region &> /dev/null; then
+        echo "Created!"
+      else
+        echo "Failed ($?), exiting!"
+        exit 99
+      fi
+    else
+      echo "exists"
+    fi
+    scripts_bucket=$bootstrap_scripts_bucket # Use Bootstrap Buckets until permanent Buckets exist
+  else
+    echo "exists"
+    echo -n "- $bootstrap_scripts_bucket Bucket... "
+    if aws s3api head-bucket --bucket $bootstrap_scripts_bucket \
+                             --profile $profile --region $region &> /dev/null; then
+      echo "exists (but is no longer needed - delete via Console!)"
+    else
+      echo "does not exist"
+    fi
   fi
 fi
 
-functions_bucket=bootstrap-functions-$account_alias-$region
-if ! aws s3api head-bucket --bucket $functions_bucket \
-                           --profile $profile --region $region &> /dev/null; then
-  echo -n "- $functions_bucket Bucket does not exist, creating... "
-  if aws s3api create-bucket --bucket $functions_bucket \
-                             --profile $profile --region $region &> /dev/null; then
-    echo "Created!"
-    sleep 1
-  else
-    echo "Failed ($?), exiting!"
-    exit 99
-  fi
+#  6. Create Lambda Function and Layer Packages
+
+if [ $packages = 1 ]; then
+  echo "Creating Packages..."
+
+  pushd $functions_dir/src &> /dev/null
+  for directory in $(ls -1d */ | sed -E -e '/^[a-z]{1,4}\/$/d;s/\/$//'); do
+    echo -n "- $directory... "
+    mkdir -p $functions_dir/target/$directory
+    (cd $directory; zip -X -r $functions_dir/target/$directory/$timestamp.zip ./* > /dev/null)
+    md5=$(md5 -q $functions_dir/target/$directory/$timestamp.zip)
+    if [ ! -f $functions_dir/target/$directory/$md5.zip ]; then
+      echo "Generated ($md5.zip)"
+      mv $functions_dir/target/$directory/$timestamp.zip $functions_dir/target/$directory/$md5.zip
+    else
+      echo "Unchanged"
+    fi
+    rm -f $functions_dir/target/$directory/????????-??????.zip
+  done
+  popd &> /dev/null
 fi
 
-#  5. Create Bootstrap Buckets
+
+#  7. Create Stacks
 
 echo "Creating Stacks..."
 
-for stack in $stacks; do
-  stack_name=${stack%:*}
-  stack_template=$templates/${stack#*:}
-  stack_config=$configuration/$account_id/$region/${stack_name}.Configuration.json
+stacks=$(sed -e '/^#/d;/^ *$/d' $configuration_dir/$account_id/$region/Stacks.dat)
 
-  # Figure out a way to do these transformations purely with jp expressions
+for stack_tuple in $stacks; do
+  stack_name=${stack_tuple%%:*}; stack_tuple=${stack_tuple#*:}
+  template=${stack_tuple%%:*}; stack_tuple=${stack_tuple#*:}
+  process=${stack_tuple%%:*}
+  [[ "$process" =~ ^(1|y|Y).*$ ]] && process=1 || process=0
+
+  stack_config=$configuration_dir/$account_id/$region/$stack_name.Configuration.json
+  stack_template=$templates_dir/$template
+
+  # Sync Buckets
+  if [ $sync = 1 ]; then
+    echo
+    echo "Syncing Buckets..."
+    echo "- $functions_bucket"
+    aws s3 sync $functions_dir/target \
+                s3://$functions_bucket \
+                --exclude '*' \
+                --include '*/*.zip' \
+                --profile $profile --region $region --output table
+
+    echo "- $scripts_bucket"
+    aws s3 sync $scripts_dir \
+                s3://$scripts_bucket \
+                --exclude '*' \
+                --include 'Linux/*' \
+                --include 'WordPress/*' \
+                --profile $profile --region $region --output table
+    sync=0
+  fi
+
+  # Extract information from Template file
+  # - Determine what capability might be needed
+  if egrep -q 'Type: *AWS::IAM::(ManagedPolicy|Role|Group|User)' $stack_template; then
+    if egrep -q ' (ManagedPolicy|Role|Group|User)Name:' $stack_template; then
+      capability=CAPABILITY_NAMED_IAM
+    else
+      capability=CAPABILITY_IAM
+    fi
+  else
+    unset capability
+  fi
+
+  # - Determine if we need to find and override a Package S3 Key
+  #   - This depends on the convention all Lambda LayerVersions and Functions have Parameters which end with
+  #     "LayerS3Key" or "FunctionS3Key", respectively
+  #   - This logic will then extract such ParameterKeys, then search for the most recent S3 Key and use this
+  #     in additional Parameters to be supplied to the stack deploy operation
+  layers=$(sed -n -e 's/^ *\([A-Za-z0-9]*\)LayerS3Key:.*$/\1/p' $stack_template | sort | uniq)
+  functions=$(sed -n -e 's/^ *\([A-Za-z0-9]*\)FunctionS3Key:.*$/\1/p' $stack_template | sort | uniq)
+
+  # Extract information from Configuration file
+  # - TODO: Figure out a way to do these transformations purely with jp expressions
   parameters=$(jp -f $stack_config 'Parameters' | sed -n -e 's/^ *"\([^"]*\)": *"\([^"]*\)".*$/\1=\2/p' | tr '\n' ' ')
   tags=$(jp -f $stack_config 'Tags' | sed -n -e 's/^ *"\([^"]*\)": *"\([^"]*\)".*$/\1=\2/p' | tr '\n' ' ')
   statement=$(jp -f $stack_config 'Statement')
@@ -217,26 +384,48 @@ for stack in $stacks; do
   statement="aws cloudformation deploy --stack-name $stack_name \\"$'\n'
   statement+="                          --template $stack_template \\"$'\n'
   statement+="                          --s3-bucket $templates_bucket \\"$'\n'
-  statement+="                          --force-upload \\"$'\n'
+  statement+="                          --s3-prefix ${template%.*} \\"$'\n'
 
+  first_parameter=1
   if [ -n "$parameters" ]; then
-    first=1
     for parameter in $parameters; do
-      if [ $first = 1 ]; then
+      if [ $first_parameter = 1 ]; then
         statement+="                          --parameter-overrides $parameter \\"$'\n'
-        first=0
+        first_parameter=0
       else
         statement+="                                                $parameter \\"$'\n'
       fi
     done
   fi
 
-  if egrep -q 'Type: *AWS::IAM::(ManagedPolicy|Role|Group|User)' $stack_template; then
-    if egrep -q ' (ManagedPolicy|Role|Group|User)Name:' $stack_template; then
-      statement+="                          --capabilities CAPABILITY_NAMED_IAM \\"$'\n'
-    else
-      statement+="                          --capabilities CAPABILITY_IAM \\"$'\n'
-    fi
+  if [ -n "$layers" ]; then
+    for layer in $layers; do
+      key=$( (cd $functions_dir/target; ls -1t ${layer}Layer/*.zip | head -1) )
+      parameter="${layer}LayerS3Key=$key"
+      if [ $first_parameter = 1 ]; then
+        statement+="                          --parameter-overrides $parameter \\"$'\n'
+        first_parameter=0
+      else
+        statement+="                                                $parameter \\"$'\n'
+      fi
+    done
+  fi
+
+  if [ -n "$functions" ]; then
+    for function in $functions; do
+      key=$( (cd $functions_dir/target; ls -1t ${function}/*.zip | head -1) )
+      parameter="${function}FunctionS3Key=$key"
+      if [ $first_parameter = 1 ]; then
+        statement+="                          --parameter-overrides $parameter \\"$'\n'
+        first_parameter=0
+      else
+        statement+="                                                $parameter \\"$'\n'
+      fi
+    done
+  fi
+
+  if [ -n "$capability" ]; then
+    statement+="                          --capabilities $capability \\"$'\n'
   fi
 
   if [ -n "$tags" ]; then
@@ -268,13 +457,28 @@ for stack in $stacks; do
 
   if [ $stack_exists = 0 ]; then
     echo -n "Create[Y/n/q]?"
-  else
+    read answer
+  elif [ $updates = 1 ]; then
     echo -n "Update[Y/n/q]?"
+    read answer
+  else
+    echo "Update Skipped"
+    answer=n
   fi
-  read answer
 
   if [[ $answer =~ (^$|^(y|Y|yes|Yes)$) ]]; then
-    if ! eval "$eval_statement"; then
+    eval "$eval_statement"
+    rc=$?
+
+    if [ $rc = 0 ]; then
+      if [ $stack_name = "Buckets" ]; then
+        echo "- Switching to permanent Buckets, please delete Bootstrap Buckets in the S3 Console"
+        templates_bucket=templates-$account-$region
+        functions_bucket=functions-$account-$region
+        scripts_bucket=scripts-$account-$region
+        sync=1
+      fi
+    else
       echo -n "Continue[y/N/q]?"
       read answer
       if [[ ! $answer =~ ^(y|Y|yes|Yes)$ ]]; then
@@ -289,6 +493,7 @@ done
 exit
 
 # Save below here
+    # Construct Stack Policy Statement. Since deploy doesn't support this, we would have to add this separately
     if [ -n "$statement" ]; then
       stack_policy_body="{ "Statement" : $(echo $statement) }"
     else
