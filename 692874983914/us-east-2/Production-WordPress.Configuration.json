@@ -6,8 +6,13 @@
     "AccountName": "Jumpstart",
     "EnvironmentName": "Production",
     "EnvironmentType": "small",
-    "WordPressProductKey": "WordPress/wordpress-5.2.4.zip"",
-    "WordPressAdministratorEmail": "aws-administrators@mjcconsulting.com"
+    "HostName": "aduue2pwp01a",
+    "WordPressServiceName": "www",
+    "WordPressAdministratorEmail": "aws-administrators@mjcconsulting.com",
+    "UserNetworks": "68.108.247.173/32,-,-,-,-,-,-,-",
+    "UserNetworkDescriptions": "Home-MCrawford,-,-,-,-,-,-,-,-",
+    "AdministratorNetworks": "68.108.247.173/32,-,-,-,-,-,-,-",
+    "AdministratorNetworkDescriptions": "Home-MCrawford,-,-,-,-,-,-,-,-"
   },
   "Tags": {
     "Company": "AWSDemoUniversity",
