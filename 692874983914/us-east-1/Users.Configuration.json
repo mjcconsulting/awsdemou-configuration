@@ -1,6 +1,7 @@
 {
   "Parameters": {
-    "AdministratorPassword": "YouMustChangeM3Immediately"
+    "AdministratorPassword": "YouMustChangeM3Immediately",
+    "ReviewerPassword": "YouMustChangeM3Immediately"
   },
   "Tags": {
     "Company": "AWSDemoUniversity",
