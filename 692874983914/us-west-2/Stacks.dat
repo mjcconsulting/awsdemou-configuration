@@ -9,7 +9,7 @@ AMIFunctions:AMIFunctions.yaml
 DomainFunctions:DomainFunctions.yaml:1
 
 #AmazonLinux2ImageCustomResource:AmazonLinux2ImageCustomResource.yaml
-WordPressAmazonLinux2ImageCustomResource:WordPressAmazonLinux2ImageCustomResource.yaml
+#WordPressAmazonLinux2ImageCustomResource:WordPressAmazonLinux2ImageCustomResource.yaml
 
 Organization-PublicHostedZone:PublicHostedZone.yaml
 Organization-PublicRecordSets:PublicRecordSets.yaml
