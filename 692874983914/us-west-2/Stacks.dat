@@ -27,5 +27,5 @@ Production-NetworkAcls:NetworkAcls.yaml
 Development-WordPress-Database:WordPress-Database-RDS.yaml
 Development-WordPress:WordPress.yaml
 
-#Production-WordPress-Database:WordPress-Database-RDS.yaml
-#Production-WordPress:WordPress.yaml
+Production-WordPress-Database:WordPress-Database-RDS.yaml
+Production-WordPress:WordPress-ASG.yaml

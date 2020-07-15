@@ -20,4 +20,4 @@ Production-VPC:VPC.yaml
 Production-NetworkAcls:NetworkAcls.yaml
 
 Production-WordPress-Database:WordPress-Database-RDS.yaml
-#Production-WordPress:WordPress.yaml
+Production-WordPress:WordPress-ASG.yaml
