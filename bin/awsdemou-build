@@ -10,6 +10,7 @@
 #
 # TODO: Current bugs in this script
 # - The section which extracts parameters from the stack_config can't handle values with embedded spaces
+# - The test for creating or updating a stack needs to check stack status for prior failures
 
 #  1. Initalize Environment
 buckets=1
@@ -21,6 +22,7 @@ templates_dir=${AWSDEMOU_TEMPLATES:-$HOME/src/$organization/awsdemou-templates}
 functions_dir=${AWSDEMOU_FUNCTIONS:-$HOME/src/$organization/awsdemou-functions}
 scripts_dir=${AWSDEMOU_SCRIPTS:-$HOME/src/$organization/awsdemou-scripts}
 configuration_dir=${AWSDEMOU_CONFIGURATION:-$HOME/src/$organization/awsdemou-configuration}
+keys_dir=${AWSDEMOU_KEYS:-$HOME/src/$organization/awsdemou-keys}
 
 region=${AWS_DEFAULT_REGION:-us-east-1}
 account=${AWS_ACCOUNT_ALIAS:-awsdemou}
@@ -34,7 +36,7 @@ sync=1
 
 usage () {
   echo "Usage: ${BASH_SOURCE##*/} [-B] [-P] [-u]"
-  echo "              [-T path] [-F path] [-S path] [-C path]"
+  echo "              [-T path] [-F path] [-S path] [-C path] [-K path]"
   echo "              [-r region] [-a account] [-u user]"
   echo "  -B          Skip Bucket Confirmation (assume permanent buckets exist)"
   echo "  -P          Skip Package Builds (assume package zip files exist)"
@@ -43,6 +45,7 @@ usage () {
   echo "  -F path     Path to awsdemou-functions repo (default: $functions_dir)"
   echo "  -S path     Path to awsdemou-scripts repo (default: $scripts_dir)"
   echo "  -C path     Path to awsdemou-configuration repo (default: $configuration_dir)"
+  echo "  -K path     Path to awsdemou-keys directory (default: $keys_dir)"
   echo "  -r region   Region (default: $region)"
   echo "  -a account  Account Alias (default: $account)"
   echo "  -u user     User (default: $user)"
@@ -50,7 +53,7 @@ usage () {
 
 #  3. Parse command line options
 
-while getopts BPuT:F:S:C:r:a:u:? arg; do
+while getopts BPuT:F:S:C:K:r:a:u:? arg; do
   case $arg in
   B)  buckets=0;;
   P)  packages=0;;
@@ -59,6 +62,7 @@ while getopts BPuT:F:S:C:r:a:u:? arg; do
   F)  functions_dir="$OPTARG";;
   S)  scripts_dir="$OPTARG";;
   C)  configuration_dir="$OPTARG";;
+  K)  keys_dir="$OPTARG";;
   r)  region="$OPTARG";;
   a)  account="$OPTARG";;
   u)  user="$OPTARG";;
@@ -132,24 +136,36 @@ elif ! grep -s -q "# AWS Demo University Configuration" "$configuration_dir/READ
   exit 43
 fi
 
+if [ -z "$keys_dir" ]; then
+  echo "-K path missing!"
+  echo "Could not automatically determine keys path, and it was not specified as a parameter"
+  exit 50
+elif [ ! -d "$keys_dir" ]; then
+  echo "-K $keys_dir not a directory: Please specify a valid directory"
+  exit 51
+elif [ ! -f "$keys_dir/awsdemou_administrator_id_rsa.pub" ]; then
+  echo "-K $keys_dir does not appear to be a valid directory of awsdemou-keys, missing awsdemou_administrator_id_rsa.pub file"
+  exit 52
+fi
+
 if [ -z "$region" ]; then
     echo "-r region missing!"
     echo "Could not automatically determine region, and it was not specified as a parameter"
-    exit 50
+    exit 80
 else
     case $region in
       us-east-1|us-east-2|us-west-2)
         ;;
       *)
         echo "-r $region invalid: Please specify a valid region (us-east-1, us-east-2 r us-west-2)"
-        exit 51;;
+        exit 81;;
     esac
 fi
 
 if [ -z "$account" ]; then
     echo "-a account missing!"
     echo "Could not automatically determine account alias, and it was not specified as a parameter"
-    exit 52
+    exit 82
 else
     case $account in
       awsdemou)
@@ -157,14 +173,14 @@ else
         ;;
       *)
         echo "-a $account invalid! Must be awsdemou"
-        exit 53;;
+        exit 83;;
     esac
 fi
 
 if [ -z "$user" ]; then
     echo "-u user missing!"
     echo "Could not automatically determine user, and it was not specified as a parameter"
-    exit 56
+    exit 86
 fi
 
 profile=$account-$user
@@ -172,12 +188,12 @@ profile=$account-$user
 if ! grep -s -q "\[profile $profile]" ~/.aws/config; then
     echo "Could not find ($account) Account ($user) User AWSCLI profile!"
     echo "Expected to find: [profile $profile] in ~/.aws/config"
-    exit 58
+    exit 88
 fi
 
 if [ ! -f "$configuration_dir/$account_id/$region/Stacks.dat" ]; then
   echo "Could not find $configuration_dir/$account_id/$region/Stacks.dat data file"
-  exit 60
+  exit 90
 fi
 
 # Prevent certain environment variables from breaking commands
@@ -336,7 +352,7 @@ for stack_tuple in $stacks; do
   stack_template=$templates_dir/$template
 
   # Sync Buckets
-  if [ $sync = 1 ]; then
+  if [ $sync -ge 1 ]; then
     echo
     echo "Syncing Buckets..."
     echo "- $functions_bucket"
@@ -354,6 +370,16 @@ for stack_tuple in $stacks; do
                 --include 'Windows/*' \
                 --include 'WordPress/*' \
                 --profile $profile --region $region --output table
+
+    if [ $sync -ge 2 -a $region = 'us-east-1' ]; then
+      echo "- $keys_bucket"
+      aws s3 sync $keys_dir \
+                  s3://$keys_bucket \
+                  --exclude '*' \
+                  --include 'awsdemou_*_id_rsa.pub' \
+                  --include 'awsdemou_reviewer_id_rsa' \
+                  --profile $profile --region $region --output table
+    fi
     sync=0
   fi
 
@@ -479,7 +505,8 @@ for stack_tuple in $stacks; do
         templates_bucket=templates-$account-$region
         functions_bucket=functions-$account-$region
         scripts_bucket=scripts-$account-$region
-        sync=1
+        keys_bucket=keys-$account
+        sync=2
       fi
     else
       echo -n "Continue[y/N/q]?"
