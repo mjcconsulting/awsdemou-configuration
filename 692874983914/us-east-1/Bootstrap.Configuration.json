@@ -1,0 +1,13 @@
+{
+  "Parameters": {
+    "AccountAlias": "awsdemou",
+    "BootstrapAccountIds": "482085898762,407866626888,-,-,-,-,-,-,-,-,-,-,-,-,-,-",
+    "BootstrapAccountNames": "Organization,Jumpstart,-,-,-,-,-,-,-,-,-,-,-,-,-,-"
+  },
+  "Tags": {
+    "Company": "AWSDemoUniversity",
+    "System": "Website",
+    "Environment": "Jumpstart",
+    "Owner": "mcrawford@mjcconsulting.com"
+  }
+}
