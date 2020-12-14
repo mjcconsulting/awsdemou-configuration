@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Simple script to build the AWS Demo University Account Virginia Region
+# Simple script to build the AWS Demo University Account
 #
 # This script depends on jp, the JMESPath binary, download from:
 # - Releases; https://github.com/jmespath/jp/releases
@@ -13,39 +13,43 @@
 # - The test for creating or updating a stack needs to check stack status for prior failures
 
 #  1. Initalize Environment
-buckets=1
-packages=1
 updates=0
 
-organization=${AWSDEMOU_ORGANIZATION:-mjcconsulting}
-templates_dir=${AWSDEMOU_TEMPLATES:-$HOME/src/$organization/awsdemou-templates}
-functions_dir=${AWSDEMOU_FUNCTIONS:-$HOME/src/$organization/awsdemou-functions}
-scripts_dir=${AWSDEMOU_SCRIPTS:-$HOME/src/$organization/awsdemou-scripts}
-configuration_dir=${AWSDEMOU_CONFIGURATION:-$HOME/src/$organization/awsdemou-configuration}
-keys_dir=${AWSDEMOU_KEYS:-$HOME/src/$organization/awsdemou-keys}
+company=AWSDemoUniversity
+
+organization=${CAMELZ_ORGANIZATION:-mjcconsulting}
+templates_dir=${CAMELZ_TEMPLATES:-$HOME/src/$organization/camelz-templates}
+functions_dir=${CAMELZ_FUNCTIONS:-$HOME/src/$organization/camelz-functions}
+documents_dir=${CAMELZ_SCRIPTS:-$HOME/src/$organization/camelz-documents}
+components_dir=${CAMELZ_COMPONENTS:-$HOME/src/$organization/camelz-components}
+scripts_dir=${CAMELZ_SCRIPTS:-$HOME/src/$organization/camelz-scripts}
+products_dir=${CAMELZ_PRODUCTS:-$HOME/src/$organization/camelz-products}
+configuration_dir=${AWSDEMOU_CONFIG:-$HOME/src/$organization/awsdemou-configuration}
 
 region=${AWS_DEFAULT_REGION:-us-east-1}
 account=${AWS_ACCOUNT_ALIAS:-awsdemou}
 user=${AWS_USER_NAME:-bootstrapadministrator}
 
 timestamp=$(date +%Y%M%d-%H%M%S)
+
+buckets=0
 sync=1
 
 
 #  2. Define functions
 
 usage () {
-  echo "Usage: ${BASH_SOURCE##*/} [-B] [-P] [-u]"
-  echo "              [-T path] [-F path] [-S path] [-C path] [-K path]"
+  echo "Usage: ${BASH_SOURCE##*/} [-u]"
+  echo "              [-T path] [-F path] [-D path] [-C path] [-S path] [-P path] [-c path]"
   echo "              [-r region] [-a account] [-u user]"
-  echo "  -B          Skip Bucket Confirmation (assume permanent buckets exist)"
-  echo "  -P          Skip Package Builds (assume package zip files exist)"
   echo "  -u          Update Existing Stacks"
-  echo "  -T path     Path to awsdemou-templates repo (default: $templates_dir)"
-  echo "  -F path     Path to awsdemou-functions repo (default: $functions_dir)"
-  echo "  -S path     Path to awsdemou-scripts repo (default: $scripts_dir)"
-  echo "  -C path     Path to awsdemou-configuration repo (default: $configuration_dir)"
-  echo "  -K path     Path to awsdemou-keys directory (default: $keys_dir)"
+  echo "  -T path     Path to camelz-templates repo (default: $templates_dir)"
+  echo "  -F path     Path to camelz-functions repo (default: $functions_dir)"
+  echo "  -D path     Path to camelz-documents repo (default: $documents_dir)"
+  echo "  -C path     Path to camelz-components repo (default: $components_dir)"
+  echo "  -S path     Path to camelz-scripts repo (default: $scripts_dir)"
+  echo "  -P path     Path to camelz-products repo (default: $products_dir)"
+  echo "  -c path     Path to awsdemou-configuration repo (default: $configuration_dir)"
   echo "  -r region   Region (default: $region)"
   echo "  -a account  Account Alias (default: $account)"
   echo "  -u user     User (default: $user)"
@@ -53,16 +57,16 @@ usage () {
 
 #  3. Parse command line options
 
-while getopts BPuT:F:S:C:K:r:a:u:? arg; do
+while getopts uT:F:D:C:S:P:c:r:a:u:? arg; do
   case $arg in
-  B)  buckets=0;;
-  P)  packages=0;;
   u)  updates=1;;
   T)  templates_dir="$OPTARG";;
   F)  functions_dir="$OPTARG";;
+  D)  documents_dir="$OPTARG";;
+  C)  components_dir="$OPTARG";;
   S)  scripts_dir="$OPTARG";;
-  C)  configuration_dir="$OPTARG";;
-  K)  keys_dir="$OPTARG";;
+  P)  products_dir="$OPTARG";;
+  c)  configuration_dir="$OPTARG";;
   r)  region="$OPTARG";;
   a)  account="$OPTARG";;
   u)  user="$OPTARG";;
@@ -84,11 +88,14 @@ elif [ ! -d "$templates_dir" ]; then
   echo "-T $templates_dir not a directory: Please specify a valid directory"
   exit 11
 elif [ ! -f "$templates_dir/README.md" ]; then
-  echo "-T $templates_dir does not appear to be a valid clone of awsdemou-templates, missing README.md file"
+  echo "-T $templates_dir does not appear to be a valid clone of camelz-templates, missing README.md file"
   exit 12
-elif ! grep -s -q "# AWS Demo University Templates" "$templates_dir/README.md" ; then
-  echo "-T $templates_dir does not appear to be a valid clone of awsdemou-templates, README.md title incorrect"
+elif ! grep -s -q "# CaMeLz Templates" "$templates_dir/README.md" ; then
+  echo "-T $templates_dir does not appear to be a valid clone of camelz-templates, README.md title incorrect"
   exit 13
+elif [ ! -d "$templates_dir/bucket" ]; then
+  echo "-T $templates_dir appears valid, but content has not yet been published to the ./bucket subdirectory"
+  exit 14
 fi
 
 if [ -z "$functions_dir" ]; then
@@ -99,53 +106,101 @@ elif [ ! -d "$functions_dir" ]; then
   echo "-F $functions_dir not a directory: Please specify a valid directory"
   exit 21
 elif [ ! -f "$functions_dir/README.md" ]; then
-  echo "-F $functions_dir does not appear to be a valid clone of awsdemou-functions, missing README.md file"
+  echo "-F $functions_dir does not appear to be a valid clone of camelz-functions, missing README.md file"
   exit 22
-elif ! grep -s -q "# AWS Demo University Functions" "$functions_dir/README.md" ; then
-  echo "-F $functions_dir does not appear to be a valid clone of awsdemou-functions, README.md title incorrect"
+elif ! grep -s -q "# CaMeLz Functions" "$functions_dir/README.md" ; then
+  echo "-F $functions_dir does not appear to be a valid clone of camelz-functions, README.md title incorrect"
   exit 23
+elif [ ! -d "$functions_dir/bucket" ]; then
+  echo "-F $functions_dir appears valid, but content has not yet been published to the ./bucket subdirectory"
+  exit 24
+fi
+
+if [ -z "$documents_dir" ]; then
+  echo "-D path missing!"
+  echo "Could not automatically determine documents path, and it was not specified as a parameter"
+  exit 30
+elif [ ! -d "$documents_dir" ]; then
+  echo "-D $documents_dir not a directory: Please specify a valid directory"
+  exit 31
+elif [ ! -f "$documents_dir/README.md" ]; then
+  echo "-D $documents_dir does not appear to be a valid clone of camelz-documents, missing README.md file"
+  exit 32
+elif ! grep -s -q "# CaMeLz Documents" "$documents_dir/README.md" ; then
+  echo "-D $documents_dir does not appear to be a valid clone of camelz-documents, README.md title incorrect"
+  exit 33
+elif [ ! -d "$documents_dir/bucket" ]; then
+  echo "-D $documents_dir appears valid, but content has not yet been published to the ./bucket subdirectory"
+  exit 34
+fi
+
+if [ -z "$components_dir" ]; then
+  echo "-C path missing!"
+  echo "Could not automatically determine components path, and it was not specified as a parameter"
+  exit 40
+elif [ ! -d "$components_dir" ]; then
+  echo "-C $components_dir not a directory: Please specify a valid directory"
+  exit 41
+elif [ ! -f "$components_dir/README.md" ]; then
+  echo "-C $components_dir does not appear to be a valid clone of camelz-components, missing README.md file"
+  exit 42
+elif ! grep -s -q "# CaMeLz Components" "$components_dir/README.md" ; then
+  echo "-C $components_dir does not appear to be a valid clone of camelz-components, README.md title incorrect"
+  exit 43
+elif [ ! -d "$components_dir/bucket" ]; then
+  echo "-C $components_dir appears valid, but content has not yet been published to the ./bucket subdirectory"
+  exit 44
 fi
 
 if [ -z "$scripts_dir" ]; then
   echo "-S path missing!"
   echo "Could not automatically determine scripts path, and it was not specified as a parameter"
-  exit 30
+  exit 50
 elif [ ! -d "$scripts_dir" ]; then
   echo "-S $scripts_dir not a directory: Please specify a valid directory"
-  exit 31
+  exit 51
 elif [ ! -f "$scripts_dir/README.md" ]; then
-  echo "-S $scripts_dir does not appear to be a valid clone of awsdemou-scripts, missing README.md file"
-  exit 32
-elif ! grep -s -q "# AWS Demo University Scripts" "$scripts_dir/README.md" ; then
-  echo "-S $scripts_dir does not appear to be a valid clone of awsdemou-scripts, README.md title incorrect"
-  exit 33
+  echo "-S $scripts_dir does not appear to be a valid clone of camelz-scripts, missing README.md file"
+  exit 52
+elif ! grep -s -q "# CaMeLz Scripts" "$scripts_dir/README.md" ; then
+  echo "-S $scripts_dir does not appear to be a valid clone of camelz-scripts, README.md title incorrect"
+  exit 53
+elif [ ! -d "$scripts_dir/bucket" ]; then
+  echo "-S $scripts_dir appears valid, but content has not yet been published to the ./bucket subdirectory"
+  exit 54
+fi
+
+if [ -z "$products_dir" ]; then
+  echo "-P path missing!"
+  echo "Could not automatically determine products path, and it was not specified as a parameter"
+  exit 60
+elif [ ! -d "$products_dir" ]; then
+  echo "-P $products_dir not a directory: Please specify a valid directory"
+  exit 61
+elif [ ! -f "$products_dir/README.md" ]; then
+  echo "-P $products_dir does not appear to be a valid clone of camelz-products, missing README.md file"
+  exit 62
+elif ! grep -s -q "# CaMeLz Products" "$products_dir/README.md" ; then
+  echo "-P $products_dir does not appear to be a valid clone of camelz-products, README.md title incorrect"
+  exit 63
+elif [ ! -d "$products_dir/bucket" ]; then
+  echo "-P $products_dir appears valid, but content has not yet been published to the ./bucket subdirectory"
+  exit 64
 fi
 
 if [ -z "$configuration_dir" ]; then
-  echo "-C path missing!"
+  echo "-c path missing!"
   echo "Could not automatically determine configuration path, and it was not specified as a parameter"
-  exit 40
+  exit 70
 elif [ ! -d "$configuration_dir" ]; then
-  echo "-C $configuration_dir not a directory: Please specify a valid directory"
-  exit 41
+  echo "-c $configuration_dir not a directory: Please specify a valid directory"
+  exit 71
 elif [ ! -f "$configuration_dir/README.md" ]; then
-  echo "-C $configuration_dir does not appear to be a valid clone of awsdemou-configuration, missing README.md file"
-  exit 42
-elif ! grep -s -q "# AWS Demo University Configuration" "$configuration_dir/README.md" ; then
-  echo "-C $configuration_dir does not appear to be a valid clone of awsdemou-configuration, README.md title incorrect"
-  exit 43
-fi
-
-if [ -z "$keys_dir" ]; then
-  echo "-K path missing!"
-  echo "Could not automatically determine keys path, and it was not specified as a parameter"
-  exit 50
-elif [ ! -d "$keys_dir" ]; then
-  echo "-K $keys_dir not a directory: Please specify a valid directory"
-  exit 51
-elif [ ! -f "$keys_dir/awsdemou_administrator_id_rsa.pub" ]; then
-  echo "-K $keys_dir does not appear to be a valid directory of awsdemou-keys, missing awsdemou_administrator_id_rsa.pub file"
-  exit 52
+  echo "-c $configuration_dir does not appear to be a valid clone of a camelz configuration repo, missing README.md file"
+  exit 72
+elif ! grep -s -q "Cross-Account Multi-Environment Landing Zones Framework Configuration" "$configuration_dir/README.md" ; then
+  echo "-c $configuration_dir does not appear to be a valid clone of a camelz configuration repo, README.md missing expected reference"
+  exit 73
 fi
 
 if [ -z "$region" ]; then
@@ -169,6 +224,7 @@ if [ -z "$account" ]; then
 else
     case $account in
       awsdemou)
+        account_name=Jumpstart
         account_id=692874983914
         ;;
       *)
@@ -191,8 +247,8 @@ if ! grep -s -q "\[profile $profile]" ~/.aws/config; then
     exit 88
 fi
 
-if [ ! -f "$configuration_dir/$account_id/$region/Stacks.dat" ]; then
-  echo "Could not find $configuration_dir/$account_id/$region/Stacks.dat data file"
+if [ ! -f "$configuration_dir/conf/$company/$account_name/$account_id/$region/Stacks.dat" ]; then
+  echo "Could not find $configuration_dir/conf/$company/$account_name/$account_id/$region/Stacks.dat data file"
   exit 90
 fi
 
@@ -204,143 +260,72 @@ unset EC2_PRIVATE_KEY
 unset EC2_CERT
 
 
-#  5. Create Bootstrap Buckets
-
-if [ ! $region = 'us-east-1' ]; then
-  location_constraint="--create-bucket-configuration LocationConstraint=$region"
-else
-  unset location_constraint
-fi
+#  5. Check Buckets
 
 templates_bucket=templates-$account-$region
-bootstrap_templates_bucket=bootstrap-templates-$account-$region
 functions_bucket=functions-$account-$region
-bootstrap_functions_bucket=bootstrap-functions-$account-$region
+documents_bucket=documents-$account-$region
+components_bucket=components-$account-$region
 scripts_bucket=scripts-$account-$region
-bootstrap_scripts_bucket=bootstrap-scripts-$account-$region
+products_bucket=products-$account-$region
 
-if [ $buckets = 1 ]; then
-  echo "Checking Buckets..."
+echo "Checking Buckets..."
 
-  echo -n "- $templates_bucket Bucket... "
-  if ! aws s3api head-bucket --bucket $templates_bucket \
-                             --profile $profile --region $region &> /dev/null; then
-    echo "does not exist"
-    echo -n "- $bootstrap_templates_bucket Bucket... "
-    if ! aws s3api head-bucket --bucket $bootstrap_templates_bucket \
-                               --profile $profile --region $region &> /dev/null; then
-      echo -n "does not exist, creating... "
-      if aws s3api create-bucket --bucket $bootstrap_templates_bucket $location_constraint \
-                                 --profile $profile --region $region &> /dev/null; then
-        echo "Created!"
-      else
-        echo "Failed ($?), exiting!"
-        exit 99
-      fi
-    else
-      echo "exists"
-    fi
-    templates_bucket=$bootstrap_templates_bucket # Use Bootstrap Buckets until permanent Buckets exist
-  else
-    echo "exists"
-    echo -n "- $bootstrap_templates_bucket Bucket... "
-    if aws s3api head-bucket --bucket $bootstrap_templates_bucket \
-                             --profile $profile --region $region &> /dev/null; then
-      echo "exists (but is no longer needed - delete via Console!)"
-    else
-      echo "does not exist"
-    fi
-  fi
-
-  echo -n "- $functions_bucket Bucket... "
-  if ! aws s3api head-bucket --bucket $functions_bucket \
-                             --profile $profile --region $region &> /dev/null; then
-    echo "does not exist"
-    echo -n "- $bootstrap_functions_bucket Bucket... "
-    if ! aws s3api head-bucket --bucket $bootstrap_functions_bucket \
-                               --profile $profile --region $region &> /dev/null; then
-      echo -n "does not exist, creating... "
-      if aws s3api create-bucket --bucket $bootstrap_functions_bucket $location_constraint \
-                                 --profile $profile --region $region &> /dev/null; then
-        echo "Created!"
-      else
-        echo "Failed ($?), exiting!"
-        exit 99
-      fi
-    else
-      echo "exists"
-    fi
-    functions_bucket=$bootstrap_functions_bucket # Use Bootstrap Buckets until permanent Buckets exist
-  else
-    echo "exists"
-    echo -n "- $bootstrap_functions_bucket Bucket... "
-    if aws s3api head-bucket --bucket $bootstrap_functions_bucket \
-                             --profile $profile --region $region &> /dev/null; then
-      echo "exists (but is no longer needed - delete via Console!)"
-    else
-      echo "does not exist"
-    fi
-  fi
-
-  echo -n "- $scripts_bucket Bucket... "
-  if ! aws s3api head-bucket --bucket $scripts_bucket \
-                             --profile $profile --region $region &> /dev/null; then
-    echo "does not exist"
-    echo -n "- $bootstrap_scripts_bucket Bucket... "
-    if ! aws s3api head-bucket --bucket $bootstrap_scripts_bucket \
-                               --profile $profile --region $region &> /dev/null; then
-      echo -n "does not exist, creating... "
-      if aws s3api create-bucket --bucket $bootstrap_scripts_bucket $location_constraint \
-                                 --profile $profile --region $region &> /dev/null; then
-        echo "Created!"
-      else
-        echo "Failed ($?), exiting!"
-        exit 99
-      fi
-    else
-      echo "exists"
-    fi
-    scripts_bucket=$bootstrap_scripts_bucket # Use Bootstrap Buckets until permanent Buckets exist
-  else
-    echo "exists"
-    echo -n "- $bootstrap_scripts_bucket Bucket... "
-    if aws s3api head-bucket --bucket $bootstrap_scripts_bucket \
-                             --profile $profile --region $region &> /dev/null; then
-      echo "exists (but is no longer needed - delete via Console!)"
-    else
-      echo "does not exist"
-    fi
-  fi
+echo -n "- $templates_bucket Bucket... "
+if ! aws s3api head-bucket --bucket $templates_bucket \
+                           --profile $profile --region $region &> /dev/null; then
+  echo "does not exist"
+else
+  echo "exists"
+  buckets=1
 fi
 
-#  6. Create Lambda Function and Layer Packages
+echo -n "- $functions_bucket Bucket... "
+if ! aws s3api head-bucket --bucket $functions_bucket \
+                           --profile $profile --region $region &> /dev/null; then
+  echo "does not exist"
+else
+  echo "exists"
+fi
 
-if [ $packages = 1 ]; then
-  echo "Creating Packages..."
+echo -n "- $documents_bucket Bucket... "
+if ! aws s3api head-bucket --bucket $documents_bucket \
+                           --profile $profile --region $region &> /dev/null; then
+  echo "does not exist"
+else
+  echo "exists"
+fi
 
-  pushd $functions_dir/src &> /dev/null
-  for directory in $(ls -1d */ | sed -E -e '/^[a-z]{1,4}\/$/d;s/\/$//'); do
-    echo -n "- $directory... "
-    mkdir -p $functions_dir/target/$directory
-    (cd $directory; zip -X -r $functions_dir/target/$directory/$timestamp.zip ./* > /dev/null)
-    md5=$(md5 -q $functions_dir/target/$directory/$timestamp.zip)
-    if [ ! -f $functions_dir/target/$directory/$md5.zip ]; then
-      echo "Generated ($md5.zip)"
-      mv $functions_dir/target/$directory/$timestamp.zip $functions_dir/target/$directory/$md5.zip
-    else
-      echo "Unchanged"
-    fi
-    rm -f $functions_dir/target/$directory/????????-??????.zip
-  done
-  popd &> /dev/null
+echo -n "- $components_bucket Bucket... "
+if ! aws s3api head-bucket --bucket $components_bucket \
+                           --profile $profile --region $region &> /dev/null; then
+  echo "does not exist"
+else
+  echo "exists"
+fi
+
+echo -n "- $scripts_bucket Bucket... "
+if ! aws s3api head-bucket --bucket $scripts_bucket \
+                           --profile $profile --region $region &> /dev/null; then
+  echo "does not exist"
+else
+  echo "exists"
+fi
+
+echo -n "- $products_bucket Bucket... "
+if ! aws s3api head-bucket --bucket $products_bucket \
+                           --profile $profile --region $region &> /dev/null; then
+  echo "does not exist"
+else
+  echo "exists"
 fi
 
 
-#  7. Create Stacks
+#  6. Create Stacks
 
 echo "Creating Stacks..."
 
-stacks=$(sed -e '/^#/d;/^ *$/d' $configuration_dir/$account_id/$region/Stacks.dat)
+stacks=$(sed -e '/^#/d;/^ *$/d' $configuration_dir/conf/$company/$account_name/$account_id/$region/Stacks.dat)
 
 for stack_tuple in $stacks; do
   stack_name=${stack_tuple%%:*}; stack_tuple=${stack_tuple#*:}
@@ -348,39 +333,16 @@ for stack_tuple in $stacks; do
   process=${stack_tuple%%:*}
   [[ "$process" =~ ^(1|y|Y).*$ ]] && process=1 || process=0
 
-  stack_config=$configuration_dir/$account_id/$region/$stack_name.Configuration.json
-  stack_template=$templates_dir/$template
+  stack_config=$configuration_dir/conf/$company/$account_name/$account_id/$region/$stack_name.Configuration.json
+  stack_template=$templates_dir/src/$template
 
-  # Sync Buckets
-  if [ $sync -ge 1 ]; then
-    echo
-    echo "Syncing Buckets..."
-    echo "- $functions_bucket"
-    aws s3 sync $functions_dir/target \
-                s3://$functions_bucket \
-                --exclude '*' \
-                --include '*/*.zip' \
-                --profile $profile --region $region --output table
-
-    echo "- $scripts_bucket"
-    aws s3 sync $scripts_dir \
-                s3://$scripts_bucket \
-                --exclude '*' \
-                --include 'Linux/*' \
-                --include 'Windows/*' \
-                --include 'WordPress/*' \
-                --profile $profile --region $region --output table
-
-    if [ $sync -ge 2 -a $region = 'us-east-1' ]; then
-      echo "- $keys_bucket"
-      aws s3 sync $keys_dir \
-                  s3://$keys_bucket \
-                  --exclude '*' \
-                  --include 'awsdemou_*_id_rsa.pub' \
-                  --include 'awsdemou_reviewer_id_rsa' \
-                  --profile $profile --region $region --output table
-    fi
-    sync=0
+  if [ ! -f $stack_config ]; then
+    echo "Stack configuration file $stack_config missing!"
+    exit 100
+  fi
+  if [ ! -f $stack_template ]; then
+    echo "Template file $stack_template missing!"
+    exit 110
   fi
 
   # Extract information from Template file
@@ -395,13 +357,18 @@ for stack_tuple in $stacks; do
     unset capability
   fi
 
-  # - Determine if we need to find and override a Package S3 Key
-  #   - This depends on the convention all Lambda LayerVersions and Functions have Parameters which end with
-  #     "LayerS3Key" or "FunctionS3Key", respectively
-  #   - This logic will then extract such ParameterKeys, then search for the most recent S3 Key and use this
-  #     in additional Parameters to be supplied to the stack deploy operation
+  # - Determine if we need to find and override a Parameter S3 Key
+  #   - This depends on the convention:
+  #     - All Lambda LayerVersions have Parameters which end with "LayerS3Key"
+  #     - All Lambda Functions have Parameters which end with "FunctionS3Key"
+  #     - All Systems Manager Documents have Parameters which end with"DocumentS3Key"
+  #     - All ImageBuilder Components have Parameters which end with "ComponentS3Key"
+  #   - This logic will then extract such ParameterKeys, then search for the most recent S3 Key and
+  #     use this in additional Parameters to be supplied to the stack deploy operation
   layers=$(sed -n -e 's/^ *\([A-Za-z0-9]*\)LayerS3Key:.*$/\1/p' $stack_template | sort | uniq)
   functions=$(sed -n -e 's/^ *\([A-Za-z0-9]*\)FunctionS3Key:.*$/\1/p' $stack_template | sort | uniq)
+  documents=$(sed -n -e 's/^ *\([A-Za-z0-9]*\)DocumentS3Key:.*$/\1/p' $stack_template | sort | uniq)
+  components=$(sed -n -e 's/^ *\([A-Za-z0-9]*\)ComponentS3Key:.*$/\1/p' $stack_template | sort | uniq)
 
   # Extract information from Configuration file
   # - TODO: Figure out a way to do these transformations purely with jp expressions
@@ -412,8 +379,10 @@ for stack_tuple in $stacks; do
   # Construct Deploy Statement
   statement="aws cloudformation deploy --stack-name $stack_name \\"$'\n'
   statement+="                          --template $stack_template \\"$'\n'
-  statement+="                          --s3-bucket $templates_bucket \\"$'\n'
-  statement+="                          --s3-prefix ${template%.*} \\"$'\n'
+  if [ $buckets = 1 ]; then
+    statement+="                          --s3-bucket $templates_bucket \\"$'\n'
+    statement+="                          --s3-prefix ${template%.*} \\"$'\n'
+  fi
 
   first_parameter=1
   if [ -n "$parameters" ]; then
@@ -429,7 +398,7 @@ for stack_tuple in $stacks; do
 
   if [ -n "$layers" ]; then
     for layer in $layers; do
-      key=$( (cd $functions_dir/target; ls -1t ${layer}Layer/*.zip | head -1) )
+      key=$( (cd $functions_dir/bucket; ls -1t ${layer}Layer/*.zip | head -1) )
       parameter="${layer}LayerS3Key=$key"
       if [ $first_parameter = 1 ]; then
         statement+="                          --parameter-overrides $parameter \\"$'\n'
@@ -442,8 +411,34 @@ for stack_tuple in $stacks; do
 
   if [ -n "$functions" ]; then
     for function in $functions; do
-      key=$( (cd $functions_dir/target; ls -1t ${function}/*.zip | head -1) )
+      key=$( (cd $functions_dir/bucket; ls -1t ${function}/*.zip | head -1) )
       parameter="${function}FunctionS3Key=$key"
+      if [ $first_parameter = 1 ]; then
+        statement+="                          --parameter-overrides $parameter \\"$'\n'
+        first_parameter=0
+      else
+        statement+="                                                $parameter \\"$'\n'
+      fi
+    done
+  fi
+
+  if [ -n "$documents" ]; then
+    for document in $documents; do
+      key=$( (cd $documents_dir/bucket; ls -1t ${document}/*.{yaml,json} | head -1) )
+      parameter="${document}DocumentS3Key=$key"
+      if [ $first_parameter = 1 ]; then
+        statement+="                          --parameter-overrides $parameter \\"$'\n'
+        first_parameter=0
+      else
+        statement+="                                                $parameter \\"$'\n'
+      fi
+    done
+  fi
+
+  if [ -n "$components" ]; then
+    for component in $components; do
+      key=$( (cd $components_dir/bucket; ls -1t ${component}/*.{yaml,json} | head -1) )
+      parameter="${component}ComponentS3Key=$key"
       if [ $first_parameter = 1 ]; then
         statement+="                          --parameter-overrides $parameter \\"$'\n'
         first_parameter=0
@@ -501,12 +496,53 @@ for stack_tuple in $stacks; do
 
     if [ $rc = 0 ]; then
       if [ $stack_name = "Buckets" ]; then
-        echo "- Switching to permanent Buckets, please delete Bootstrap Buckets in the S3 Console"
-        templates_bucket=templates-$account-$region
-        functions_bucket=functions-$account-$region
-        scripts_bucket=scripts-$account-$region
-        keys_bucket=keys-$account
-        sync=2
+        buckets=1
+
+        # Sync Buckets
+        if [ $sync -ge 1 ]; then
+          echo
+          echo "Syncing Buckets..."
+          echo "- $templates_bucket"
+          aws s3 sync $templates_dir/bucket \
+                      s3://$templates_bucket \
+                      --exclude '*' \
+                      --include '*/*.template' \
+                      --profile $profile --region $region --output table
+
+          echo "- $functions_bucket"
+          aws s3 sync $functions_dir/bucket \
+                      s3://$functions_bucket \
+                      --exclude '*' \
+                      --include '*/*.zip' \
+                      --profile $profile --region $region --output table
+
+          echo "- $documents_bucket"
+          aws s3 sync $documents_dir/bucket \
+                      s3://$documents_bucket \
+                      --exclude '*' \
+                      --include '*/*.yaml' \
+                      --include '*/*.json' \
+                      --profile $profile --region $region --output table
+
+          echo "- $components_bucket"
+          aws s3 sync $components_dir/bucket \
+                      s3://$components_bucket \
+                      --exclude '*' \
+                      --include '*/*.yaml' \
+                      --include '*/*.json' \
+                      --profile $profile --region $region --output table
+
+          echo "- $scripts_bucket"
+          aws s3 sync $scripts_dir/bucket \
+                      s3://$scripts_bucket \
+                      --profile $profile --region $region --output table
+
+          echo "- $products_bucket"
+          aws s3 sync $products_dir/bucket \
+                      s3://$products_bucket \
+                      --profile $profile --region $region --output table
+          sync=0
+        fi
       fi
     else
       echo -n "Continue[y/N/q]?"
