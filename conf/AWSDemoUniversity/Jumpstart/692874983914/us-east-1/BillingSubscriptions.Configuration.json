@@ -1,10 +1,8 @@
 {
   "Parameters": {
-    "TopicPrefix": "DEMO",
     "BillsTopicEmailEndpoint": "aws-bills@mjcconsulting.com",
     "UrgentBillsTopicEmailEndpoint": "aws-managers@mjcconsulting.com",
-    "UrgentBillsTopicPhoneEndpoint": "+14156525483",
-    "EnvironmentType": "nano"
+    "UrgentBillsTopicPhoneEndpoint": "+14156525483"
   },
   "Tags": {
     "Company": "AWSDemoUniversity",

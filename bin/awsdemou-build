@@ -23,7 +23,7 @@ functions_dir=${CAMELZ_FUNCTIONS:-$HOME/src/$organization/camelz-functions}
 documents_dir=${CAMELZ_SCRIPTS:-$HOME/src/$organization/camelz-documents}
 components_dir=${CAMELZ_COMPONENTS:-$HOME/src/$organization/camelz-components}
 scripts_dir=${CAMELZ_SCRIPTS:-$HOME/src/$organization/camelz-scripts}
-products_dir=${CAMELZ_PRODUCTS:-$HOME/src/$organization/camelz-products}
+installers_dir=${CAMELZ_INSTALLERS:-$HOME/src/$organization/camelz-installers}
 configuration_dir=${AWSDEMOU_CONFIG:-$HOME/src/$organization/awsdemou-configuration}
 
 region=${AWS_DEFAULT_REGION:-us-east-1}
@@ -40,7 +40,7 @@ sync=1
 
 usage () {
   echo "Usage: ${BASH_SOURCE##*/} [-u]"
-  echo "              [-T path] [-F path] [-D path] [-C path] [-S path] [-P path] [-c path]"
+  echo "              [-T path] [-F path] [-D path] [-C path] [-S path] [-I path] [-c path]"
   echo "              [-r region] [-a account] [-u user]"
   echo "  -u          Update Existing Stacks"
   echo "  -T path     Path to camelz-templates repo (default: $templates_dir)"
@@ -48,7 +48,7 @@ usage () {
   echo "  -D path     Path to camelz-documents repo (default: $documents_dir)"
   echo "  -C path     Path to camelz-components repo (default: $components_dir)"
   echo "  -S path     Path to camelz-scripts repo (default: $scripts_dir)"
-  echo "  -P path     Path to camelz-products repo (default: $products_dir)"
+  echo "  -I path     Path to camelz-installers repo (default: $installers_dir)"
   echo "  -c path     Path to awsdemou-configuration repo (default: $configuration_dir)"
   echo "  -r region   Region (default: $region)"
   echo "  -a account  Account Alias (default: $account)"
@@ -57,7 +57,7 @@ usage () {
 
 #  3. Parse command line options
 
-while getopts uT:F:D:C:S:P:c:r:a:u:? arg; do
+while getopts uT:F:D:C:S:I:c:r:a:u:? arg; do
   case $arg in
   u)  updates=1;;
   T)  templates_dir="$OPTARG";;
@@ -65,7 +65,7 @@ while getopts uT:F:D:C:S:P:c:r:a:u:? arg; do
   D)  documents_dir="$OPTARG";;
   C)  components_dir="$OPTARG";;
   S)  scripts_dir="$OPTARG";;
-  P)  products_dir="$OPTARG";;
+  I)  installers_dir="$OPTARG";;
   c)  configuration_dir="$OPTARG";;
   r)  region="$OPTARG";;
   a)  account="$OPTARG";;
@@ -170,21 +170,21 @@ elif [ ! -d "$scripts_dir/bucket" ]; then
   exit 54
 fi
 
-if [ -z "$products_dir" ]; then
-  echo "-P path missing!"
-  echo "Could not automatically determine products path, and it was not specified as a parameter"
+if [ -z "$installers_dir" ]; then
+  echo "-I path missing!"
+  echo "Could not automatically determine installers path, and it was not specified as a parameter"
   exit 60
-elif [ ! -d "$products_dir" ]; then
-  echo "-P $products_dir not a directory: Please specify a valid directory"
+elif [ ! -d "$installers_dir" ]; then
+  echo "-I $installers_dir not a directory: Please specify a valid directory"
   exit 61
-elif [ ! -f "$products_dir/README.md" ]; then
-  echo "-P $products_dir does not appear to be a valid clone of camelz-products, missing README.md file"
+elif [ ! -f "$installers_dir/README.md" ]; then
+  echo "-I $installers_dir does not appear to be a valid clone of camelz-installers, missing README.md file"
   exit 62
-elif ! grep -s -q "# CaMeLz Products" "$products_dir/README.md" ; then
-  echo "-P $products_dir does not appear to be a valid clone of camelz-products, README.md title incorrect"
+elif ! grep -s -q "# CaMeLz Installers" "$installers_dir/README.md" ; then
+  echo "-I $installers_dir does not appear to be a valid clone of camelz-installers, README.md title incorrect"
   exit 63
-elif [ ! -d "$products_dir/bucket" ]; then
-  echo "-P $products_dir appears valid, but content has not yet been published to the ./bucket subdirectory"
+elif [ ! -d "$installers_dir/bucket" ]; then
+  echo "-I $installers_dir appears valid, but content has not yet been published to the ./bucket subdirectory"
   exit 64
 fi
 
@@ -267,7 +267,7 @@ functions_bucket=functions-$account-$region
 documents_bucket=documents-$account-$region
 components_bucket=components-$account-$region
 scripts_bucket=scripts-$account-$region
-products_bucket=products-$account-$region
+installers_bucket=installers-$account-$region
 
 echo "Checking Buckets..."
 
@@ -312,8 +312,8 @@ else
   echo "exists"
 fi
 
-echo -n "- $products_bucket Bucket... "
-if ! aws s3api head-bucket --bucket $products_bucket \
+echo -n "- $installers_bucket Bucket... "
+if ! aws s3api head-bucket --bucket $installers_bucket \
                            --profile $profile --region $region &> /dev/null; then
   echo "does not exist"
 else
@@ -537,9 +537,9 @@ for stack_tuple in $stacks; do
                       s3://$scripts_bucket \
                       --profile $profile --region $region --output table
 
-          echo "- $products_bucket"
-          aws s3 sync $products_dir/bucket \
-                      s3://$products_bucket \
+          echo "- $installers_bucket"
+          aws s3 sync $installers_dir/bucket \
+                      s3://$installers_bucket \
                       --profile $profile --region $region --output table
           sync=0
         fi
