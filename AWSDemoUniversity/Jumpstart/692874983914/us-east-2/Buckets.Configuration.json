@@ -1,6 +1,9 @@
 {
   "Parameters": {
-    "AccountAlias": "awsdemou"
+    "AccountAlias": "awsdemou",
+    "EnvironmentName": "Jumpstart",
+    "UseBucketManagers": "true",
+    "DeletionPolicy": "Delete"
   },
   "Tags": {
     "Company": "AWSDemoUniversity",

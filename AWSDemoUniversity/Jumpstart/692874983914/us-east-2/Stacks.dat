@@ -1,10 +1,14 @@
-# Stack_Name:Template:Process
+# Stack_Name:Template:Process # Comment
+Buckets:Buckets.yaml
+Layers:Layers.yaml:1
+Codes:Codes.yaml
+Functions:Functions.yaml
+
 Keys:Keys.yaml
+
 Topics:Topics.yaml
 Subscriptions:Subscriptions.yaml
-Buckets:Buckets.yaml
 
-Layers:Layers.yaml:1
 AMIFunctions:AMIFunctions.yaml
 DomainFunctions:DomainFunctions.yaml:1
 
